@@ -56,7 +56,7 @@ def find_coincidence_for_list(file_list,
     coincidences_num = []
 
     # Iterate through the DataFrames (values in df_list)
-    for df_name, df in df_list.item():
+    for df_name, df in df_list.items():
         timed_coincidences = find_coincidence(df, 
                                               delta_mean, 
                                               delta_std, 
