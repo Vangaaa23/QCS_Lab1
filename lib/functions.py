@@ -82,3 +82,12 @@ def get_data_from_file(files_vec, resolution):
 def gaussian(x, amplitude, mean, std):
     """Funzione gaussiana."""
     return amplitude * np.exp(-((x - mean) ** 2) / (2 * std ** 2))
+
+def LHL_print(H_min_array, raw_data):
+    security_params = [1e-6, 1e-8, 1e-10, 1e-12, 1e-14, 1e-16, 1e-18, 1e-20, 1e-22, 1e-24, 1e-28]
+    output_length = np.arange(1,10001)
+    output_length_given_security_param = []
+    security_param_given_output_length = []
+    for sec_param in security_params:
+        for data, H_min in zip(raw_data, H_min_array):
+            output_length_given_security_param.append(leftover_hashing_length(data, H_min, ))
