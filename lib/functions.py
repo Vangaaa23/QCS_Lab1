@@ -1,9 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.linalg import ishermitian
-import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
-from math import inf, sqrt
+from math import inf
 
 def dataframe_creation(filename, resolution, duration):
     df = pd.read_csv(filename, delimiter=';', comment='#', names=['Time','Channel'], header=None)
@@ -45,6 +42,7 @@ def find_coincidence_for_list(file_list,
     df_list = {}
 
     for file, df_name in zip(file_list, df_names):
+        print(f"Creating dataframe for {file}")
         df_list[df_name] = dataframe_creation(file, resolution, duration)
 
     # Define the output list
@@ -57,6 +55,7 @@ def find_coincidence_for_list(file_list,
 
     # Iterate through the DataFrames (values in df_list)
     for df_name, df in df_list.items():
+        print(f"Searching for coincidences on in dataframe {df_name}")
         timed_coincidences = find_coincidence(df, 
                                               delta_mean, 
                                               delta_std, 
@@ -83,11 +82,12 @@ def gaussian(x, amplitude, mean, std):
     """Funzione gaussiana."""
     return amplitude * np.exp(-((x - mean) ** 2) / (2 * std ** 2))
 
-def LHL_print(H_min_array, raw_data):
-    security_params = [1e-6, 1e-8, 1e-10, 1e-12, 1e-14, 1e-16, 1e-18, 1e-20, 1e-22, 1e-24, 1e-28]
-    output_length = np.arange(1,10001)
-    output_length_given_security_param = []
-    security_param_given_output_length = []
-    for sec_param in security_params:
-        for data, H_min in zip(raw_data, H_min_array):
-            output_length_given_security_param.append(leftover_hashing_length(data, H_min, ))
+def get_probabilities(coincidences):
+    probabilities = []
+    for i in range(len(coincidences)):
+        if i%2 == 0:
+            probabilities.append(float(coincidences[i] / (coincidences[i] + coincidences[i + 1]))) 
+        else: 
+            probabilities.append(float(coincidences[i] / (coincidences[i] + coincidences[i - 1])))
+    return probabilities
+

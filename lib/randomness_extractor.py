@@ -106,9 +106,9 @@ def max_extracted_length(
     epsilon: float
 ) -> int:
     """
-    Compute the maximum number of extractable bits ℓ according to the Leftover Hash Lemma:
+    Compute the maximum number of extractable bits l according to the Leftover Hash Lemma:
 
-        ℓ ≤ H_min * n - 2·log2(1/ε)
+        l ≤ H_min * n - 2·log2(1/ε)
 
     We take the floor to get an integer.
 
@@ -123,17 +123,17 @@ def max_extracted_length(
 
     Returns:
     --------
-    ℓ : int
+    l : int
         Maximum extractable length.
     """
     if not (0 < epsilon < 1):
         raise ValueError("epsilon must be in (0,1)")
     raw_entropy = h_min * data_length
     subtract = 2 * math.log2(1 / epsilon)
-    ℓ = math.floor(raw_entropy - subtract)
-    if ℓ < 0:
+    l = math.floor(raw_entropy - subtract)
+    if l < 0:
         raise ValueError("Parameters yield negative extractable length")
-    return ℓ
+    return l
 
 def safe_max_length(h_min: float, n: int, epsilon: float) -> int:
     """
@@ -143,32 +143,69 @@ def safe_max_length(h_min: float, n: int, epsilon: float) -> int:
         return max_extracted_length(h_min, n, epsilon)
     except ValueError:
         warnings.warn(
-            f"Leftover-Hashing parameters yield ℓ<0 (H_min={h_min}, n={n}, ε={epsilon}). "
-            "Setting ℓ = 0."
+            f"Leftover-Hashing parameters yield l<0 (H_min={h_min}, n={n}, ε={epsilon}). "
+            "Setting l = 0."
         )
         return 0
 
 
 def safe_extract(raw_data, H_min, epsilon, *, random_state=None):
     """
-    Compute extractable length ℓ = max_extracted_length(H_min, n, ε).
-    If ℓ < 0, warn and return empty array.
-    Otherwise, generate an ℓ×n Toeplitz matrix and extract bits.
+    Compute extractable length l = max_extracted_length(H_min, n, ε).
+    If l < 0, warn and return empty array.
+    Otherwise, generate an l×n Toeplitz matrix and extract bits.
     """
     n = len(raw_data)
     try:
-        ℓ = max_extracted_length(H_min, n, epsilon)
+        l = max_extracted_length(H_min, n, epsilon)
     except ValueError as e:
         warnings.warn(
-            f"Leftover-Hashing parameters yield ℓ<0 (H_min={H_min}, n={n}, ε={epsilon}). "
+            f"Leftover-Hashing parameters yield l<0 (H_min={H_min}, n={n}, ε={epsilon}). "
             "No bits extracted."
         )
         return np.zeros(0, dtype=np.uint8)
 
-    if ℓ == 0:
+    if l == 0:
         # nothing to extract
         return np.zeros(0, dtype=np.uint8)
 
     # now build the Toeplitz matrix and extract
-    T = generate_toeplitz_matrix(ℓ, n, random_state=random_state)
+    T = generate_toeplitz_matrix(l, n, random_state=random_state)
     return extract_random_bits(raw_data, T)
+
+def LHL_print(H_min_array, raw_data):
+    """
+    Compute two tables:
+      1) l(ε) = max_extracted_length(H_min, n, ε) for each ε in security_params
+      2) ε(k) = leftover_hashing_epsilon(H_min, n, k) for k = 1 .. max_k
+
+    Returns:
+      output_len_table (np.ndarray): shape (len(security_params), len(raw_data))
+      sec_param_table  (np.ndarray): shape (max_k, len(raw_data))
+    """
+    security_params = [1e-6, 1e-8, 1e-10, 1e-12, 1e-14,
+                       1e-16, 1e-18, 1e-20, 1e-22, 1e-24, 1e-28]
+    max_k = 10000
+
+    # Pre-allocate result arrays
+    output_len_table = np.zeros((len(security_params), len(raw_data)), dtype=int)
+    sec_param_table  = np.zeros((max_k,              len(raw_data)), dtype=float)
+
+    # 1) l vs ε
+    for i, eps in enumerate(security_params):
+        for j, (H_min, data) in enumerate(zip(H_min_array, raw_data)):
+            n = len(data)
+            try:
+                l = max_extracted_length(H_min, n, eps)
+            except ValueError:
+                # negative extractable length → treat as zero
+                l = 0
+            output_len_table[i, j] = l
+
+    # 2) ε vs k
+    for k in range(1, max_k + 1):
+        for j, (H_min, data) in enumerate(zip(H_min_array, raw_data)):
+            n = len(data)
+            sec_param_table[k - 1, j] = leftover_hashing_epsilon(H_min, n, k)
+
+    return output_len_table, sec_param_table
