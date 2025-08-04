@@ -91,27 +91,6 @@ def get_probabilities(coincidences):
     return probabilities
 
 def analyze_coincidence_distribution(filename, resolution, window, min_duration=60, n_bins=100):
-    """
-    Analyze time difference distribution for coincidences and fit a Gaussian.
-
-    Parameters:
-    -----------
-    filename : str
-        Path to the file with raw measurement data (semicolon-separated, 2 columns).
-    resolution : float
-        Time resolution per unit (e.g., 80.955e-12 seconds).
-    window : float
-        Coincidence time window (in seconds).
-    min_duration : float
-        Duration in seconds for which to keep the data.
-    n_bins : int
-        Number of bins for the histogram.
-
-    Returns:
-    --------
-    dict with amplitude, mean, std and their uncertainties
-    """
-    
     # Load data
     measurements = np.loadtxt(filename, delimiter=";").astype(np.uint64)
     timetags = measurements[:, 0] * resolution

@@ -1,5 +1,5 @@
 import numpy as np
-import warnings
+import matplotlib.pyplot as plt
 import math
 from scipy.linalg import toeplitz
 from typing import Sequence, Union, Optional
@@ -11,23 +11,6 @@ def generate_toeplitz_matrix(
     *,
     random_state: Optional[Union[int, np.random.Generator]] = None
 ) -> np.ndarray:
-    """
-    Generate an n×m binary Toeplitz matrix (entries in {0,1}).
-
-    Parameters:
-    -----------
-    n : int
-        Number of rows.
-    m : int
-        Number of columns.
-    random_state : int | np.random.Generator, optional
-        Seed or RNG for reproducibility. If int, uses np.random.default_rng(random_state).
-
-    Returns:
-    --------
-    toepl : np.ndarray
-        An array of shape (n, m) with dtype=np.uint8 and entries 0 or 1.
-    """
     # Set up RNG
     if isinstance(random_state, (int, np.integer)):
         rng = np.random.default_rng(random_state)
@@ -46,51 +29,14 @@ def generate_toeplitz_matrix(
     toepl = toeplitz(c0, r0).astype(np.uint8)
     return toepl
 
-
 def leftover_hashing_epsilon(h_min: float, data_length: int, output_length: int) -> float:
-    """
-    Compute the security parameter ε for a given min-entropy extractor.
-
-    From Leftover Hash Lemma:
-        ε = 2^{-(H_min * n - k)/2}
-
-    Parameters:
-    -----------
-    h_min : float
-        Min-entropy rate (bits of entropy per input bit).
-    data_length : int
-        Length n of the raw input (number of bits).
-    output_length : int
-        Number k of output bits.
-
-    Returns:
-    --------
-    epsilon : float
-        The resulting statistical distance.
-    """
     exponent = -(h_min * data_length - output_length) / 2
     return 2 ** exponent
-
 
 def extract_random_bits(
     raw_bits: Sequence[int],
     toeplitz_matrix: np.ndarray
 ) -> np.ndarray:
-    """
-    Perform bit-wise randomness extraction via a binary matrix multiply mod 2.
-
-    Parameters:
-    -----------
-    raw_bits : sequence of {0,1}
-        The input bit-string of length m = toeplitz_matrix.shape[1].
-    toeplitz_matrix : np.ndarray
-        A binary matrix of shape (n, m).
-
-    Returns:
-    --------
-    extracted_bits : np.ndarray
-        An array of length n with entries 0 or 1.
-    """
     raw = np.asarray(raw_bits, dtype=np.uint8)
     n, m = toeplitz_matrix.shape
     if raw.ndim != 1 or raw.size != m:
@@ -105,27 +51,6 @@ def max_extracted_length(
     data_length: int,
     epsilon: float
 ) -> int:
-    """
-    Compute the maximum number of extractable bits l according to the Leftover Hash Lemma:
-
-        l ≤ H_min * n - 2·log2(1/ε)
-
-    We take the floor to get an integer.
-
-    Parameters:
-    -----------
-    h_min : float
-        Min-entropy rate (bits per input bit).
-    data_length : int
-        Number n of input bits.
-    epsilon : float
-        Desired security parameter (statistical distance).
-
-    Returns:
-    --------
-    l : int
-        Maximum extractable length.
-    """
     if not (0 < epsilon < 1):
         raise ValueError("epsilon must be in (0,1)")
     raw_entropy = h_min * data_length
@@ -135,77 +60,52 @@ def max_extracted_length(
         raise ValueError("Parameters yield negative extractable length")
     return l
 
-def safe_max_length(h_min: float, n: int, epsilon: float) -> int:
-    """
-    Like max_extracted_length, but returns 0 if parameters yield negative length.
-    """
-    try:
-        return max_extracted_length(h_min, n, epsilon)
-    except ValueError:
-        warnings.warn(
-            f"Leftover-Hashing parameters yield l<0 (H_min={h_min}, n={n}, ε={epsilon}). "
-            "Setting l = 0."
-        )
-        return 0
+def output_length_given_sec_param(H_min_array, epsilon_array, raw_bits_list):
+    if len(H_min_array) != len(raw_bits_list):
+        raise ValueError("H_min_array and raw_bits_list must have the same length.")
 
+    output_matrix = []
+    for H_min, raw_bits in zip(H_min_array, raw_bits_list):
+        data_length = len(raw_bits)
+        row = [
+            max_extracted_length(H_min, data_length, eps)
+            for eps in epsilon_array
+        ]
+        output_matrix.append(row)
 
-def safe_extract(raw_data, H_min, epsilon, *, random_state=None):
-    """
-    Compute extractable length l = max_extracted_length(H_min, n, ε).
-    If l < 0, warn and return empty array.
-    Otherwise, generate an l×n Toeplitz matrix and extract bits.
-    """
-    n = len(raw_data)
-    try:
-        l = max_extracted_length(H_min, n, epsilon)
-    except ValueError as e:
-        warnings.warn(
-            f"Leftover-Hashing parameters yield l<0 (H_min={H_min}, n={n}, ε={epsilon}). "
-            "No bits extracted."
-        )
-        return np.zeros(0, dtype=np.uint8)
+    return output_matrix
 
-    if l == 0:
-        # nothing to extract
-        return np.zeros(0, dtype=np.uint8)
+def print_output_matrix(output_matrix, epsilon_array, dataset_labels=None):
+    if dataset_labels is None:
+        dataset_labels = [f"Dataset {i+1}" for i in range(len(output_matrix))]
 
-    # now build the Toeplitz matrix and extract
-    T = generate_toeplitz_matrix(l, n, random_state=random_state)
-    return extract_random_bits(raw_data, T)
+    # Header
+    header = ["Dataset \\ ε"] + [f"{eps:.0e}" for eps in epsilon_array]
+    col_widths = [max(len(str(val)) for val in col) for col in zip(*([header] + [
+        [label] + [str(val) for val in row] for label, row in zip(dataset_labels, output_matrix)
+    ]))]
 
-def LHL_print(H_min_array, raw_data):
-    """
-    Compute two tables:
-      1) l(ε) = max_extracted_length(H_min, n, ε) for each ε in security_params
-      2) ε(k) = leftover_hashing_epsilon(H_min, n, k) for k = 1 .. max_k
+    # Print header
+    print(" | ".join(f"{h:<{w}}" for h, w in zip(header, col_widths)))
+    print("-+-".join("-" * w for w in col_widths))
 
-    Returns:
-      output_len_table (np.ndarray): shape (len(security_params), len(raw_data))
-      sec_param_table  (np.ndarray): shape (max_k, len(raw_data))
-    """
-    security_params = [1e-6, 1e-8, 1e-10, 1e-12, 1e-14,
-                       1e-16, 1e-18, 1e-20, 1e-22, 1e-24, 1e-28]
-    max_k = 10000
+    # Print rows
+    for label, row in zip(dataset_labels, output_matrix):
+        print(" | ".join(f"{val:<{w}}" for val, w in zip([label] + row, col_widths)))
 
-    # Pre-allocate result arrays
-    output_len_table = np.zeros((len(security_params), len(raw_data)), dtype=int)
-    sec_param_table  = np.zeros((max_k,              len(raw_data)), dtype=float)
+def plot_output_lengths_vs_security(output_lengths, epsilon_array, H_min_array, dataset_labels=None):
+    if dataset_labels is None:
+        dataset_labels = [f"H_min = {h}" for h in H_min_array]
 
-    # 1) l vs ε
-    for i, eps in enumerate(security_params):
-        for j, (H_min, data) in enumerate(zip(H_min_array, raw_data)):
-            n = len(data)
-            try:
-                l = max_extracted_length(H_min, n, eps)
-            except ValueError:
-                # negative extractable length → treat as zero
-                l = 0
-            output_len_table[i, j] = l
+    plt.figure(figsize=(8, 6))
+    for i, output_row in enumerate(output_lengths):
+        plt.plot(epsilon_array, output_row, marker='o', label=dataset_labels[i])
 
-    # 2) ε vs k
-    for k in range(1, max_k + 1):
-        for j, (H_min, data) in enumerate(zip(H_min_array, raw_data)):
-            n = len(data)
-            sec_param_table[k - 1, j] = leftover_hashing_epsilon(H_min, n, k)
-
-    return output_len_table, sec_param_table
+    plt.xscale('log')
+    plt.xlabel("Security parameter $\\varepsilon$")
+    plt.ylabel("Extractable output length $\\ell(\\varepsilon)$")
+    plt.title("Extractable length vs Security parameter")
+    plt.grid(True, which="both", ls="--", linewidth=0.5)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
