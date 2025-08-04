@@ -60,9 +60,9 @@ def stokes_params_and_quantum_tomography_min_entropy(coincidences):   # Function
     }
     # Calculate Stokes parameters
     S_0 = (intensities['H'] + intensities['V'])/(intensities['H'] + intensities['V'])
-    S_1 = (intensities['D'] - intensities['A'])/(intensities['D'] + intensities['A'])
-    S_2 = (intensities['R'] - intensities['L'])/(intensities['R'] + intensities['L'])
-    S_3 = (intensities['H'] - intensities['V'])/(intensities['H'] + intensities['V'])
+    S_1 = (intensities['H'] - intensities['V'])/(intensities['H'] + intensities['V'])
+    S_2 = (intensities['D'] - intensities['A'])/(intensities['D'] + intensities['A'])
+    S_3 = (intensities['R'] - intensities['L'])/(intensities['R'] + intensities['L'])
 
 
     # Find the quantum conditional min-entropy with tomography
