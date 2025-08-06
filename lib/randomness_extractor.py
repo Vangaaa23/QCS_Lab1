@@ -75,9 +75,49 @@ def output_length_given_sec_param(H_min_array, epsilon_array, raw_bits_list):
 
     return output_matrix
 
-def print_output_matrix(output_matrix, epsilon_array, dataset_labels=None):
-    if dataset_labels is None:
-        dataset_labels = [f"Dataset {i+1}" for i in range(len(output_matrix))]
+def plot_bit_rate(security_params, output_length_given_sec_param, period, dataset_labels=None, _figsize=(6,6)):
+    """
+    Plots the relationship between security parameters and bitrate.
+    """
+    if not dataset_labels:
+        dataset_labels = [
+            'Trusted', 
+            'EUP', 
+            'TOMO', 
+            '4-POVM', 
+            '6-POVM'
+        ]
+
+    # Extract series in order 0,1,2,3,4
+    series = [output_length_given_sec_param[i] for i in range(len(dataset_labels))]
+
+    if any(len(s) != len(security_params) for s in series):
+        raise ValueError("Each output-length series must have the same length as security_params.")
+
+    plt.figure(figsize=_figsize)
+    for i, current_output_length in enumerate(series):
+        # compute bit-rate elementwise
+        bit_rate = [L / period for L in current_output_length]
+        plt.plot(security_params, bit_rate, marker='o', label=dataset_labels[i])
+
+    plt.grid(True, linestyle="--", alpha=0.7)
+    plt.xscale('log')
+    plt.xlabel("Security Parameter [$\log_2 \\Delta$]")
+    plt.ylabel("Bitrate [bit/s]")
+    plt.title("Bitrate vs. Security Parameter")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def print_output_matrix(output_matrix, epsilon_array, dataset_labels=None,):
+    if not dataset_labels:
+        dataset_labels = [
+            'Trusted', 
+            'EUP', 
+            'TOMO', 
+            '4-POVM', 
+            '6-POVM'
+        ]
 
     # Header
     header = ["Dataset \\ ε"] + [f"{eps:.0e}" for eps in epsilon_array]
@@ -93,11 +133,17 @@ def print_output_matrix(output_matrix, epsilon_array, dataset_labels=None):
     for label, row in zip(dataset_labels, output_matrix):
         print(" | ".join(f"{val:<{w}}" for val, w in zip([label] + row, col_widths)))
 
-def plot_output_lengths_vs_security(output_lengths, epsilon_array, H_min_array, dataset_labels=None):
-    if dataset_labels is None:
-        dataset_labels = [f"H_min = {h}" for h in H_min_array]
+def plot_output_lengths_vs_security(output_lengths, epsilon_array, H_min_array, dataset_labels=None, _figsize=(6,6)):
+    if not dataset_labels:
+        dataset_labels = [
+            'Trusted', 
+            'EUP', 
+            'TOMO', 
+            '4-POVM', 
+            '6-POVM'
+        ]
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=_figsize)
     for i, output_row in enumerate(output_lengths):
         plt.plot(epsilon_array, output_row, marker='o', label=dataset_labels[i])
 

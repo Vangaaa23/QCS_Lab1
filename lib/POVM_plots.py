@@ -205,4 +205,4 @@ def F6_POVM_evaluation(r):
   print(f'Point is in octhaedron: {point_in_octhaedron(r)}')
   print(f'Guessing Probability: {guessing_prob}')
   print(f'Min-entropy:  {-np.log2(guessing_prob)}')
-  print('======================================================================)')
+  print('======================================================================')
